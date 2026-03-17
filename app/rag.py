@@ -46,9 +46,14 @@ The user's profile:
 - Financial goal: {user_profile.get('goal', 'unknown')}
 """
 
-    # Step 6: Use override prompt if provided, otherwise use default
+    # Step 6: Build prompt
+    # override_prompt is used for sim/goals calls — Fin's persona + user's exact numbers
+    # Regular /ask calls use the default educational prompt
     if override_prompt:
-        prompt = f"{override_prompt}\n\nCONTEXT (use if relevant):\n{context}"
+        prompt = f"{override_prompt}\n\nRELEVANT CONTEXT FROM SINGAPORE FINANCE KNOWLEDGE BASE (use if helpful):\n{context}"
+        # Sim conversations need higher temperature so responses feel natural and varied
+        temperature = 0.8
+        max_tokens = 300   # Keep sim responses concise — they're conversational, not essays
     else:
         prompt = f"""You are AmpliFI, a friendly Singapore financial literacy assistant.
 Answer the user's question using the context provided below and your knowledge of Singapore finance.
@@ -65,16 +70,21 @@ QUESTION:
 {query}
 
 ANSWER:"""
+        temperature = 0.3
+        max_tokens = 1000
 
     completion = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=1000,
-        temperature=0.3
+        max_tokens=max_tokens,
+        temperature=temperature
     )
 
+    response_text = completion.choices[0].message.content
+    print(f"[RAG] override={'YES' if override_prompt else 'NO'} temp={temperature} → {response_text[:80]}")
+
     return {
-        "response": completion.choices[0].message.content,
+        "response": response_text,
         "disclaimer": False,
         "sources_used": len(top_matches)
     }
